@@ -87,11 +87,14 @@ class AudioTest extends BaseTest {
     public static native long getTcRec();
     public static native long getTePlay();
 
+    public static native long getAaCb();
+    public static native long getAaFrame();
+
     AudioTest(Context context) {
         super(context);
         playbackRepetitions = getIntPreference(context, R.string.preference_audio_out_reps, 10);
         recordingRepetitions = getIntPreference(context, R.string.preference_audio_in_reps, 5);
-        threshold = getIntPreference(context, R.string.preference_audio_in_threshold, 5000);
+        threshold = getIntPreference(context, R.string.preference_audio_in_threshold, 2200);
 
         //Check for optimal output sample rate and buffer size
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -359,7 +362,7 @@ class AudioTest extends BaseTest {
             long tb = last_tb;  // When WALT started a beep (according to WALT clock)
             short[] wave = getRecordedWave();
             int noisyAtFrame = 0;  // First frame when some noise starts
-            while (noisyAtFrame < wave.length && wave[noisyAtFrame] < threshold)
+            while (noisyAtFrame < wave.length && wave[noisyAtFrame] < 100)
                 noisyAtFrame++;
             if (noisyAtFrame == wave.length) {
                 logger.log("WARNING: No sound detected");
@@ -382,11 +385,25 @@ class AudioTest extends BaseTest {
             // the buffer was recorded
             double latencyEnqueue_ms = (tb - te - silent_us) / 1000.;
 
+            long kaCb = getAaCb() - waltDevice.clock.baseTime;
+            double aaLatency = (kaCb - tb) / 1000.;
+            double frameDelay = getAaFrame() / 48.;
+
             logger.log(String.format(Locale.US,
-                    "Processed: L_cb = %.3f ms, L_eq = %.3f ms, noisy frame = %d",
+                    "1000 Processed: L_cb = %.3f ms, L_eq = %.3f ms, noisy frame = %d, aa latency = %.3f ms, aa frame delay = + %.3f ms",
                     latencyCb_ms,
                     latencyEnqueue_ms,
-                    noisyAtFrame
+                    noisyAtFrame,
+                    aaLatency,
+                    frameDelay
+            ));
+
+
+
+            logger.log(String.format(Locale.US,
+                    "Latency summary: DSP latency = %.3f ms, OS latency = %.3f",
+                    latencyCb_ms,
+                    aaLatency + frameDelay
             ));
 
             if (testStateListener != null) testStateListener.onTestPartialResult(latencyCb_ms);

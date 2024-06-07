@@ -178,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Add basic version and device info to the log
         logger.log(String.format("WALT v%s  (versionCode=%d)",
-                BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+                "test", 5)); //BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
         logger.log("WALT protocol version " + WaltDevice.PROTOCOL_VERSION);
         logger.log("DEVICE INFO:");
         logger.log("  " + Build.FINGERPRINT);

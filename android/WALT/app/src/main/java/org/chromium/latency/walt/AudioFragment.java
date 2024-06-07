@@ -104,7 +104,7 @@ public class AudioFragment extends Fragment implements View.OnClickListener,
         modeSpinner = (Spinner) view.findViewById(R.id.spinner_audio_mode);
         ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.audio_mode_array, android.R.layout.simple_spinner_item);
-        modeAdapter.setDropDownViewResource(R.layout.support_simple_spinner_dropdown_item);
+        //modeAdapter.setDropDownViewResource(R.layout.support_simple_spinner_dropdown_item);
         modeSpinner.setAdapter(modeAdapter);
 
         return view;

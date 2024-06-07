@@ -25,6 +25,6 @@ LOCAL_CFLAGS := -g -DUSE_LIBLOG -Werror
 # needed for logcat
 LOCAL_SHARED_LIBRARIES := libcutils
 
-LOCAL_LDLIBS := -lOpenSLES -llog
+LOCAL_LDLIBS := -lOpenSLES -llog -laaudio
 
 include $(BUILD_SHARED_LIBRARY)

@@ -46,8 +46,8 @@ public class AboutFragment extends Fragment {
     public void onResume() {
         super.onResume();
         TextView textView = (TextView) getActivity().findViewById(R.id.txt_build_info);
-        String text = String.format("WALT v%s  (versionCode=%d)\n",
-                BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);
+        String text = ""; /* = String.format("WALT v%s  (versionCode=%d)\n",
+                BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);*/
         text += "WALT protocol version: " + WaltDevice.PROTOCOL_VERSION + "\n";
         text += "Android Build ID: " + Build.DISPLAY + "\n";
         text += "Android API Level: " + Build.VERSION.SDK_INT + "\n";

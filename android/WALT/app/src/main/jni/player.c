@@ -26,6 +26,9 @@
 #include <SLES/OpenSLES_Android.h>
 #include <SLES/OpenSLES_AndroidConfiguration.h>
 
+#include <stdlib.h>
+#include <aaudio/AAudio.h>
+
 #include "sync_clock.h"
 
 // logging
@@ -70,12 +73,15 @@ static unsigned int bufferSizeInBytes = 0;
 static unsigned buffersRemaining = 0;
 static short warmedUp = 0;
 
+static AAudioStream* stream = NULL;
 
 // Timestamps
 // te - enqueue time
 // tc - callback time
 int64_t te_play = 0, te_rec = 0, tc_rec = 0;
-
+// aa_cbk_ts - callback timestamp
+// aa_frame_delay - delay between buffer start and frame with detected signal
+int64_t aa_cbk_ts = 0, aa_frame_delay = 0;
 /**
  * Create wave tables for audio out.
  */
@@ -361,6 +367,20 @@ void bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     // assert(SL_RESULT_SUCCESS == result);
 }
 
+aaudio_data_callback_result_t
+captureCallback(AAudioStream* clb, void* ctx, void* audioData, int32_t numFrames)
+{
+    aa_cbk_ts = uptimeMicros();
+    int16_t* audio = (int16_t*) audioData;
+    for (int i = 0; i < numFrames; ++i) {
+        if (audio[i] > 100) {
+            aa_frame_delay = i;
+            return AAUDIO_CALLBACK_RESULT_STOP;
+        }
+    }
+    return AAUDIO_CALLBACK_RESULT_CONTINUE;
+}
+
 // create audio recorder
 jboolean Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* env,
     jclass clazz, jint optimalFrameRate, jint framesToRecord)
@@ -455,6 +475,34 @@ jboolean Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* en
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Audio recorder created, buffer size: %d frames",
                         recorder_frames);
 
+    // Setting AAudio stream for recording
+    AAudioStreamBuilder* streamBuilder = NULL;
+    aaudio_result_t res = AAudio_createStreamBuilder(&streamBuilder);
+    if (res != AAUDIO_OK) {
+        abort();
+    }
+    AAudioStreamBuilder_setDirection(streamBuilder, AAUDIO_DIRECTION_INPUT);
+    AAudioStreamBuilder_setSampleRate(streamBuilder, 48000);
+    AAudioStreamBuilder_setChannelCount(streamBuilder, 1);
+    AAudioStreamBuilder_setFormat(streamBuilder, AAUDIO_FORMAT_PCM_I16);
+    AAudioStreamBuilder_setInputPreset(streamBuilder, AAUDIO_INPUT_PRESET_VOICE_RECOGNITION);
+    AAudioStreamBuilder_setPerformanceMode(streamBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+
+    AAudioStreamBuilder_setDataCallback(streamBuilder, captureCallback, NULL);
+
+    result = AAudioStreamBuilder_openStream(streamBuilder, &stream);
+    if (result != AAUDIO_OK) {
+        abort();
+    }
+    __android_log_print(ANDROID_LOG_INFO, APPNAME, "[debug_msg_walt] AAudio stream build");
+    AAudioStream_setBufferSizeInFrames(stream, AAudioStream_getFramesPerBurst(stream) * 2);
+    res = AAudioStream_requestStart(stream);
+    if (res != AAUDIO_OK) {
+        abort();
+    }
+
+    AAudioStreamBuilder_delete(streamBuilder);
+
     return JNI_TRUE;
 }
 
@@ -490,14 +538,20 @@ void Java_org_chromium_latency_walt_AudioTest_startRecording(JNIEnv* env, jclass
     (void)result;
 
     // start recording
+    __android_log_print(ANDROID_LOG_INFO, APPNAME, "[debug_msg_walt] AAudio stream started");
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_RECORDING);
     assert(SL_RESULT_SUCCESS == result);
     (void)result;
     bqPlayerRecorderBusy = 1;
+
+    aa_frame_delay = aa_cbk_ts = 0;
+    AAudioStream_requestStart(stream);
 }
 
 jshortArray Java_org_chromium_latency_walt_AudioTest_getRecordedWave(JNIEnv *env, jclass cls)
 {
+    __android_log_print(ANDROID_LOG_INFO, APPNAME, "[debug_msg_walt] AAudio stream closed");
+    AAudioStream_requestStop(stream);
     jshortArray result;
     result = (*env)->NewShortArray(env, recorder_frames);
     if (result == NULL) {
@@ -517,4 +571,12 @@ jlong Java_org_chromium_latency_walt_AudioTest_getTeRec(JNIEnv *env, jclass cls)
 
 jlong Java_org_chromium_latency_walt_AudioTest_getTePlay(JNIEnv *env, jclass cls) {
     return (jlong) te_play;
+}
+
+jlong Java_org_chromium_latency_walt_AudioTest_getAaCb(JNIEnv *env, jclass cls) {
+    return (jlong) aa_cbk_ts;
+}
+
+jlong Java_org_chromium_latency_walt_AudioTest_getAaFrame(JNIEnv *env, jclass cls) {
+    return (jlong) aa_frame_delay;
 }
